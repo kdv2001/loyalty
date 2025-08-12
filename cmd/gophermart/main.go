@@ -5,14 +5,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
+	accrualSystemHTTP "github.com/kdv2001/loyalty/internal/clients/accrualSystem/http"
 	httpHandlers "github.com/kdv2001/loyalty/internal/handlers/http"
 	"github.com/kdv2001/loyalty/internal/store/postgress/auth"
+	"github.com/kdv2001/loyalty/internal/store/postgress/loyalty"
 	"github.com/kdv2001/loyalty/internal/store/postgress/session"
+	loyaltyUseCase "github.com/kdv2001/loyalty/internal/usecases/loyalty"
 	"github.com/kdv2001/loyalty/internal/usecases/user"
 )
 
@@ -46,7 +51,25 @@ func initService() error {
 		return err
 	}
 
+	loyaltyStore, err := loyalty.NewImplementation(ctx, postgresConn)
+	if err != nil {
+		return err
+	}
+
+	u, err := url.Parse(initValues.accrualSystemAddress)
+	if err != nil {
+		return fmt.Errorf("failed to init looger: %w", err)
+	}
+
+	client := &http.Client{
+		Transport: http.DefaultTransport,
+		Timeout:   5 * time.Second,
+	}
+
+	accrualClient := accrualSystemHTTP.NewClient(client, *u)
 	userUC := user.NewImplementation(authStore, sessionStore)
+	loyaltyUC := loyaltyUseCase.NewImplementation(accrualClient, loyaltyStore)
+
 	log, err := zap.NewDevelopment()
 	if err != nil {
 		return fmt.Errorf("failed to init looger: %w", err)
@@ -61,7 +84,7 @@ func initService() error {
 
 	authMW := httpHandlers.NewAuthMiddleware(userUC)
 
-	handlers := httpHandlers.New(userUC)
+	handlers := httpHandlers.New(userUC, loyaltyUC)
 	chiMux.Route("/api/user", func(r chi.Router) {
 		r.Post("/register", handlers.Register)
 		r.Post("/login", handlers.Login)

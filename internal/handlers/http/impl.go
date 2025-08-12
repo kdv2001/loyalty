@@ -16,13 +16,17 @@ type userClient interface {
 	LoginUser(ctx context.Context, reg domain.Login) (domain.SessionToken, error)
 }
 
+type loyaltyClient interface{}
+
 type Implementation struct {
 	a userClient
+	l loyaltyClient
 }
 
-func New(a userClient) *Implementation {
+func New(a userClient, l loyaltyClient) *Implementation {
 	return &Implementation{
 		a: a,
+		l: l,
 	}
 }
 
