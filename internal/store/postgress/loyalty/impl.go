@@ -4,6 +4,9 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/kdv2001/loyalty/internal/domain"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
 )
 
 type Implementation struct {
@@ -47,4 +50,28 @@ func NewImplementation(ctx context.Context, c *pgxpool.Pool) (*Implementation, e
 	return &Implementation{
 		c: c,
 	}, nil
+}
+
+func (i *Implementation) AccrualPoints(ctx context.Context) error {
+
+}
+
+func (i *Implementation) WithdrawPoints(ctx context.Context, operation domain.Operation) error {
+	tx, err := i.c.Begin(ctx)
+	if err != nil {
+		return serviceErorrs.AppErrorFromError(err)
+	}
+	defer func() {
+		if err != nil {
+			if err = tx.Rollback(ctx); err != nil {
+
+			}
+		}
+	}()
+
+	tx.QueryRow(ctx, ``)
+}
+
+func (i *Implementation) GetBalance(ctx context.Context, userID domain.ID) domain.Money {
+	i.
 }

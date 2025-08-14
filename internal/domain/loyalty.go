@@ -1,5 +1,11 @@
 package domain
 
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
+
 type AccrualState string
 
 const (
@@ -13,15 +19,28 @@ const (
 	Processed AccrualState = "PROCESSED"
 )
 
-type Operation string
+type OperationType string
 
 const (
 	// Accrual начисление баллов
-	Accrual Operation = "ACCRUAL"
+	Accrual OperationType = "ACCRUAL"
 	// Withdraw списание баллов
-	Withdraw Operation = "WITHDRAW"
+	Withdraw OperationType = "WITHDRAW"
 )
 
 type Order struct {
 	ID uint64
+}
+
+type Money struct {
+	Currency string
+	Amount   decimal.Decimal
+}
+
+type Operation struct {
+	ID       ID
+	OrderID  ID
+	Type     OperationType
+	Amount   Money
+	CratedAt time.Time
 }
