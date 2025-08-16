@@ -53,7 +53,7 @@ func NewImplementation(ctx context.Context, c *pgxpool.Pool) (*Implementation, e
 }
 
 func (i *Implementation) AccrualPoints(ctx context.Context) error {
-
+	return nil
 }
 
 func (i *Implementation) WithdrawPoints(ctx context.Context, operation domain.Operation) error {
@@ -70,8 +70,9 @@ func (i *Implementation) WithdrawPoints(ctx context.Context, operation domain.Op
 	}()
 
 	tx.QueryRow(ctx, ``)
+	return nil
 }
 
 func (i *Implementation) GetBalance(ctx context.Context, userID domain.ID) domain.Money {
-	i.
+	return domain.Money{}
 }
