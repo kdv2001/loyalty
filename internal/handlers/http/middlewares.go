@@ -29,25 +29,33 @@ func NewAuthMiddleware(auth authClient) *AuthMiddleware {
 
 func (am *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := r.Cookie(AuthCookiesName)
-		if err != nil {
-			switch {
-			case errors.Is(err, http.ErrNoCookie):
-				writeError(r.Context(), w,
-					serviceErorrs.NewUnauthorized().Wrap(err, "authorized cookie not found"))
+		token := r.Header.Get(AuthorizationKey)
+
+		if token == "" {
+			c, err := r.Cookie(AuthorizationKey)
+			if err != nil {
+				switch {
+				case errors.Is(err, http.ErrNoCookie):
+					writeError(r.Context(), w,
+						serviceErorrs.NewUnauthorized().Wrap(err, "authorized cookie not found"))
+					return
+				}
+
+				writeError(r.Context(), w, err)
 				return
 			}
 
-			writeError(r.Context(), w, err)
-			return
+			token = c.Value
 		}
-
-		token := c.Value
 
 		session, err := am.auth.AuthUser(r.Context(), domain.SessionToken{
 			Token: token,
 		})
 		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeError(r.Context(), w,
+					serviceErorrs.NewUnauthorized().Wrap(err, "authorized cookie not found"))
+			}
 			writeError(r.Context(), w, err)
 			return
 		}

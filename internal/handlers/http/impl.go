@@ -68,11 +68,13 @@ func (i *Implementation) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:    AuthCookiesName,
+		Name:    AuthorizationKey,
 		Value:   authInfo.Token,
 		Expires: time.Now().Add(24 * 180 * time.Hour),
 		Secure:  true,
 	})
+
+	w.Header().Set(AuthorizationKey, authInfo.Token)
 
 	w.WriteHeader(http.StatusOK)
 	if _, err = w.Write([]byte("success register and authorize")); err != nil {
@@ -109,12 +111,15 @@ func (i *Implementation) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO почему то тесты не хотят кушать куку
 	http.SetCookie(w, &http.Cookie{
-		Name:    AuthCookiesName,
+		Name:    AuthorizationKey,
 		Value:   authInfo.Token,
 		Expires: time.Now().Add(24 * 180 * time.Hour),
-		Secure:  true,
+		Secure:  false,
 	})
+
+	w.Header().Set(AuthorizationKey, authInfo.Token)
 
 	w.WriteHeader(http.StatusOK)
 	if _, err = w.Write([]byte("success authorize")); err != nil {
@@ -137,7 +142,7 @@ func (i *Implementation) AddOrder(w http.ResponseWriter, r *http.Request) {
 
 	if isValidID := LuhnAlgorithm(string(body)); !isValidID {
 		writeError(ctx, w,
-			serviceErorrs.NewBadRequest().Wrap(nil, "invalid order id"))
+			serviceErorrs.NewUnprocessableEntity().Wrap(nil, "invalid order id"))
 		return
 	}
 
@@ -163,18 +168,25 @@ func (i *Implementation) AddOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = i.l.AddOrder(ctx, userID, order); err != nil {
+		switch {
+		case errors.Is(err, domain.ErrActionCompletedEarly):
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		writeError(ctx, w, err)
 		return
 	}
+
+	w.WriteHeader(http.StatusAccepted)
 
 	return
 }
 
 type order struct {
-	Number     string `json:"number"`
-	Status     string `json:"status"`
-	Accrual    int64  `json:"accrual,omitempty"`
-	UploadedAt string `json:"uploaded_at"`
+	Number     string  `json:"number"`
+	Status     string  `json:"status"`
+	Accrual    float64 `json:"accrual,omitempty"`
+	UploadedAt string  `json:"uploaded_at"`
 }
 
 // GetOrders GET /api/user/orders — получение списка загруженных пользователем номеров заказов,
@@ -205,10 +217,12 @@ func (i *Implementation) GetOrders(w http.ResponseWriter, r *http.Request) {
 
 	transportOrders := make([]order, 0, len(resOrders))
 	for _, ro := range resOrders {
+		val, _ := ro.AccrualAmount.Amount.Float64()
+
 		transportOrders = append(transportOrders, order{
 			Number:     strconv.FormatUint(ro.ID.ID, 10),
 			Status:     string(ro.State),
-			Accrual:    ro.AccrualAmount.Amount.IntPart(),
+			Accrual:    val,
 			UploadedAt: ro.CreatedAt.Format(time.RFC3339),
 		})
 	}
@@ -219,12 +233,14 @@ func (i *Implementation) GetOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set(ContentType, ApplicationJSONType)
 	_, err = w.Write(jsonBytes)
 	if err != nil {
 		writeError(ctx, w, err)
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
 
 	return
 }

@@ -3,12 +3,14 @@ package session
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kdv2001/loyalty/internal/domain"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
 )
 
 type Implementation struct {
@@ -76,6 +78,11 @@ func (repo *Implementation) GetSessions(ctx context.Context, token domain.Sessio
 	s := session{}
 	if err := repo.c.QueryRow(ctx, `Select id, user_id, created_at, device from session where token = $1`,
 		token.Token).Scan(&s.ID, &s.UserID, &s.CreatedAt, &s.Device); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.SessionInfo{}, serviceErorrs.NewNotFound().
+				Wrap(domain.ErrNotFound, "session not found")
+		}
+
 		return domain.SessionInfo{}, err
 	}
 

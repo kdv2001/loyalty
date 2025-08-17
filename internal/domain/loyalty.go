@@ -32,6 +32,12 @@ func StateFromString(state string) AccrualState {
 	return Invalid
 }
 
+type BonusCurrency string
+
+const (
+	GopherMarketBonuses = BonusCurrency("GopherMart")
+)
+
 type OperationType string
 
 const (

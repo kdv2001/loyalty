@@ -1,7 +1,9 @@
 package http
 
 const (
-	AuthCookiesName = "session_token"
+	AuthorizationKey    = "Authorization"
+	ContentType         = "Content-Type"
+	ApplicationJSONType = "application/json"
 
 	userIDKey = "userIDKey" //
 )

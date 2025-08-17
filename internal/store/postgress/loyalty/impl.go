@@ -23,8 +23,8 @@ var accrualTable = `create table if not exists orders (
                                       user_id      bigint NOT NULL,
                                       order_id     bigint NOT NULL,                                    
                                       created_at   timestamp WITHOUT TIME ZONE NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
-                                      currency     text,
-                                      amount       decimal,
+                                      currency     text NOT NULL default (''),
+                                      amount       decimal NOT NULL DEFAULT(0),
                                       state        text,                  
                                       primary key  (user_id, order_id))
 `
@@ -58,13 +58,14 @@ func NewImplementation(ctx context.Context, c *pgxpool.Pool) (*Implementation, e
 }
 
 type orderModel struct {
-	ID            sql.NullInt64  `db:"id"`
-	UserID        sql.NullInt64  `db:"user_id"`
-	OrderID       sql.NullInt64  `db:"order_id"`
-	Status        sql.NullString `db:"status"`
-	CreatedAt     sql.NullTime   `db:"created_at"`
-	AccrualAmount sql.NullInt64  `db:"amount"`
-	Currency      sql.NullString `db:"currency"`
+	ID        sql.NullInt64  `db:"id"`
+	UserID    sql.NullInt64  `db:"user_id"`
+	OrderID   sql.NullInt64  `db:"order_id"`
+	Status    sql.NullString `db:"status"`
+	CreatedAt sql.NullTime   `db:"created_at"`
+	// TODO поправить
+	AccrualAmount sql.NullFloat64 `db:"amount"`
+	Currency      sql.NullString  `db:"currency"`
 }
 
 // AddOrder создает заявку на начисление баллов в заказе
@@ -141,7 +142,7 @@ func (i *Implementation) GetOrders(ctx context.Context, userID domain.ID) (domai
 			CreatedAt: order.CreatedAt.Time,
 			AccrualAmount: domain.Money{
 				Currency: order.Currency.String,
-				Amount:   decimal.NewFromInt(order.AccrualAmount.Int64),
+				Amount:   decimal.NewFromFloat(order.AccrualAmount.Float64),
 			},
 		})
 	}
@@ -230,7 +231,7 @@ func (i *Implementation) GetOrderForAccruals(ctx context.Context) (domain.Orders
 			CreatedAt: order.CreatedAt.Time,
 			AccrualAmount: domain.Money{
 				Currency: order.Currency.String,
-				Amount:   decimal.NewFromInt(order.AccrualAmount.Int64),
+				Amount:   decimal.NewFromFloat(order.AccrualAmount.Float64),
 			},
 		})
 	}

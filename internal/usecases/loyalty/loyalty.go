@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kdv2001/loyalty/internal/domain"
+	"github.com/kdv2001/loyalty/internal/pkg/logger"
 	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
 )
 
@@ -41,13 +42,6 @@ func NewImplementation(ctx context.Context, loyaltyClient loyaltyClient, store l
 func (i *Implementation) AddOrder(ctx context.Context, userID domain.ID, order domain.Order) error {
 	err := i.store.AddOrder(ctx, userID, order)
 	if err != nil {
-		switch {
-		case errors.Is(err, domain.ErrActionCompletedEarly):
-			// TODO это не ошибка, можно подвязаться на статус
-
-			return nil
-
-		}
 		return err
 	}
 
@@ -60,6 +54,11 @@ func (i *Implementation) GetOrders(ctx context.Context, userID domain.ID) (domai
 
 func (i *Implementation) ProcessAccrual(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Errorf(ctx, "recovered from panic: %v", err)
+		}
+	}()
 
 	for {
 		select {
@@ -77,26 +76,28 @@ func (i *Implementation) ProcessAccrual(ctx context.Context) {
 func (i *Implementation) processAccrual(ctx context.Context) error {
 	orders, err := i.store.GetOrderForAccruals(ctx)
 	if err != nil {
-		return serviceErorrs.AppErrorFromError(err)
+		return err
 	}
 
 	for _, order := range orders {
 		var res domain.Order
-		res, err = i.loyaltyClient.GetAccruals(ctx, order.ID)
+		tCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		res, err = i.loyaltyClient.GetAccruals(tCtx, order.ID)
 		if err != nil {
 			switch {
 			case errors.Is(err, domain.ErrNoContent):
 				continue
 			}
 
-			return serviceErorrs.AppErrorFromError(err)
+			return err
 		}
 
 		if res.State != domain.Processed {
 			order.State = res.State
-			err = i.store.UpdateOrderStatus(ctx, order)
+			err = i.store.UpdateOrderStatus(tCtx, order)
 			if err != nil {
-				return serviceErorrs.AppErrorFromError(err)
+				return err
 			}
 			continue
 		}
@@ -104,11 +105,10 @@ func (i *Implementation) processAccrual(ctx context.Context) error {
 		order.State = res.State
 		order.AccrualAmount = res.AccrualAmount
 
-		err = i.store.AccrualPoints(ctx, order)
+		err = i.store.AccrualPoints(tCtx, order)
 		if err != nil {
-			return serviceErorrs.AppErrorFromError(err)
+			return err
 		}
-
 	}
 
 	return nil

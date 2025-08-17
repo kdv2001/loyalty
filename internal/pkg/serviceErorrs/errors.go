@@ -40,6 +40,10 @@ func NewUnauthorized() *AppError {
 	return &AppError{"unauthorized", http.StatusUnauthorized, nil, ""}
 }
 
+func NewUnprocessableEntity() *AppError {
+	return &AppError{"unprocessable entity", http.StatusUnprocessableEntity, nil, ""}
+}
+
 func NewAppError(err error) *AppError {
 	return &AppError{"internal error", http.StatusInternalServerError, err, ""}
 }
@@ -57,8 +61,8 @@ func (err *AppError) IsInternalError() bool {
 	if err.Code/100 == 5 {
 		return true
 	}
-	// TODO поправить
-	return true
+
+	return false
 }
 
 func (err *AppError) Wrap(baseErr error, desc string) *AppError {

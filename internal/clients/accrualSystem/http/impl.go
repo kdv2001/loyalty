@@ -33,9 +33,9 @@ func NewClient(client httpClient, serverURL url.URL) *Client {
 }
 
 type accrualsResponse struct {
-	Order   string `json:"order"`
-	Status  string `json:"status"`
-	Accrual int64  `json:"accrual"`
+	Order   string  `json:"order"`
+	Status  string  `json:"status"`
+	Accrual float64 `json:"accrual"`
 }
 
 func (c *Client) GetAccruals(ctx context.Context, orderID domain.ID) (domain.Order, error) {
@@ -43,45 +43,57 @@ func (c *Client) GetAccruals(ctx context.Context, orderID domain.ID) (domain.Ord
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, getAccrualsURL.String(), nil)
 	if err != nil {
-		return domain.Order{}, serviceErorrs.AppErrorFromError(err)
+		return domain.Order{}, serviceErorrs.NewAppError(err)
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return domain.Order{}, serviceErorrs.AppErrorFromError(err)
+		return domain.Order{}, serviceErorrs.NewAppError(err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return domain.Order{}, serviceErorrs.NewAppError(err)
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		switch resp.StatusCode {
 		case http.StatusNoContent:
-			return domain.Order{}, serviceErorrs.NewNoContent().Wrap(domain.ErrNoContent, "accrual status")
+			return domain.Order{}, serviceErorrs.NewNoContent().Wrap(domain.ErrNoContent, "")
 		case http.StatusInternalServerError:
-			return domain.Order{}, serviceErorrs.NewAppError(nil).Wrap(nil, "accrual status")
+			return domain.Order{}, serviceErorrs.NewAppError(nil)
 		case http.StatusTooManyRequests:
-			return domain.Order{}, serviceErorrs.NewTooManyRequests().Wrap(nil, "accrual status")
+			return domain.Order{}, serviceErorrs.NewTooManyRequests()
 		}
 	}
 
 	ar := new(accrualsResponse)
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return domain.Order{}, serviceErorrs.NewAppError(nil)
-	}
-
 	err = json.Unmarshal(body, ar)
 	if err != nil {
-		return domain.Order{}, serviceErorrs.NewAppError(nil)
+		return domain.Order{}, serviceErorrs.NewAppError(err)
 	}
 
 	return domain.Order{
 		ID:    orderID,
-		State: domain.StateFromString(ar.Status),
+		State: statusToDomain(ar.Status),
 		AccrualAmount: domain.Money{
-			Currency: "GopherMarketBonuses",
-			Amount:   decimal.NewFromInt(ar.Accrual),
+			Currency: string(domain.GopherMarketBonuses),
+			Amount:   decimal.NewFromFloat(ar.Accrual),
 		},
 	}, nil
+}
+
+func statusToDomain(state string) domain.AccrualState {
+	switch state {
+	case "REGISTERED":
+		return domain.Processing
+	case "PROCESSING":
+		return domain.Processing
+	case "PROCESSED":
+		return domain.Processed
+	}
+	return domain.Invalid
 }
