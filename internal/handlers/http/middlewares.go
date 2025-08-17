@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -30,8 +31,14 @@ func (am *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(AuthCookiesName)
 		if err != nil {
-			appErr := serviceErorrs.AppErrorFromError(err).LogServerError(r.Context())
-			http.Error(w, appErr.String(), appErr.Code)
+			switch {
+			case errors.Is(err, http.ErrNoCookie):
+				writeError(r.Context(), w,
+					serviceErorrs.NewUnauthorized().Wrap(err, "authorized cookie not found"))
+				return
+			}
+
+			writeError(r.Context(), w, err)
 			return
 		}
 
@@ -40,8 +47,7 @@ func (am *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 			Token: token,
 		})
 		if err != nil {
-			appErr := serviceErorrs.AppErrorFromError(err).LogServerError(r.Context())
-			http.Error(w, appErr.String(), appErr.Code)
+			writeError(r.Context(), w, err)
 			return
 		}
 
@@ -51,6 +57,11 @@ func (am *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 		return
 	})
+}
+
+func getUserID(ctx context.Context) (domain.ID, bool) {
+	val, ok := ctx.Value(userIDKey).(domain.ID)
+	return val, ok
 }
 
 // AddLoggerToContextMiddleware помещает logger в context

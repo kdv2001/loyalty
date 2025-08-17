@@ -9,15 +9,28 @@ import (
 type AccrualState string
 
 const (
-	// Registered заказ зарегистрирован, но начисление не рассчитано
-	Registered AccrualState = "PROCESSED"
 	// Invalid заказ не принят к расчёту, и вознаграждение не будет начислено
 	Invalid AccrualState = "INVALID"
+	// New заказ зарегистрирован, но начисление не рассчитано
+	New AccrualState = "NEW"
 	// Processing расчёт начисления в процессе
 	Processing AccrualState = "PROCESSING"
 	// Processed расчёт начисления окончен
 	Processed AccrualState = "PROCESSED"
 )
+
+func StateFromString(state string) AccrualState {
+	switch state {
+	case string(New):
+		return New
+	case string(Processing):
+		return Processing
+	case string(Processed):
+		return Processed
+	}
+
+	return Invalid
+}
 
 type OperationType string
 
@@ -28,8 +41,13 @@ const (
 	Withdraw OperationType = "WITHDRAW"
 )
 
+type Orders []Order
+
 type Order struct {
-	ID uint64
+	ID            ID
+	State         AccrualState
+	CreatedAt     time.Time
+	AccrualAmount Money
 }
 
 type Money struct {
@@ -43,4 +61,9 @@ type Operation struct {
 	Type     OperationType
 	Amount   Money
 	CratedAt time.Time
+}
+
+type Balance struct {
+	Current   Money
+	Withdrawn Money
 }

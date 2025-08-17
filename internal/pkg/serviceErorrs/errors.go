@@ -13,11 +13,15 @@ type AppError struct {
 	Msg         string
 	Code        int
 	Base        error  `json:"-"`
-	Description string `json:"-"`
+	Description string `json:"description,omitempty"`
 }
 
 func NewBadRequest() *AppError {
 	return &AppError{"bad request", http.StatusBadRequest, nil, ""}
+}
+
+func NewConflict() *AppError {
+	return &AppError{"conflict", http.StatusConflict, nil, ""}
 }
 
 func NewNotFound() *AppError {
@@ -36,15 +40,15 @@ func NewUnauthorized() *AppError {
 	return &AppError{"unauthorized", http.StatusUnauthorized, nil, ""}
 }
 
-func NewAppError() *AppError {
-	return &AppError{"internal error", http.StatusInternalServerError, nil, ""}
+func NewAppError(err error) *AppError {
+	return &AppError{"internal error", http.StatusInternalServerError, err, ""}
 }
 
 func AppErrorFromError(inputError error) *AppError {
 	var appErr *AppError
 	ok := errors.As(inputError, &appErr)
 	if !ok {
-		return NewAppError().Wrap(inputError, "")
+		return NewAppError(inputError)
 	}
 	return appErr
 }
@@ -53,7 +57,8 @@ func (err *AppError) IsInternalError() bool {
 	if err.Code/100 == 5 {
 		return true
 	}
-	return false
+	// TODO поправить
+	return true
 }
 
 func (err *AppError) Wrap(baseErr error, desc string) *AppError {
@@ -63,7 +68,7 @@ func (err *AppError) Wrap(baseErr error, desc string) *AppError {
 }
 
 func (err *AppError) Is(target error) bool {
-	var targetAppErr AppError
+	targetAppErr := new(AppError)
 	ok := errors.As(target, &targetAppErr)
 	if !ok {
 		return target == err.Base
@@ -76,6 +81,7 @@ func (err *AppError) LogServerError(ctx context.Context) *AppError {
 		logger.FromContext(ctx).
 			Errorf("[%s] %d %s %v", "", err.Code, err.Description, err.Base)
 	}
+
 	return err
 }
 

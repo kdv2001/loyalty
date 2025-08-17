@@ -57,7 +57,7 @@ func (c *Client) GetAccruals(ctx context.Context, orderID domain.ID) error {
 		case http.StatusNoContent:
 			return serviceErorrs.NewNoContent().Wrap(nil, "accrual status")
 		case http.StatusInternalServerError:
-			return serviceErorrs.NewAppError().Wrap(nil, "accrual status")
+			return serviceErorrs.NewAppError(nil).Wrap(nil, "accrual status")
 		case http.StatusTooManyRequests:
 			return serviceErorrs.NewTooManyRequests().Wrap(nil, "accrual status")
 		}
@@ -66,12 +66,12 @@ func (c *Client) GetAccruals(ctx context.Context, orderID domain.ID) error {
 	ar := new(accrualsResponse)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return serviceErorrs.NewAppError().Wrap(err, "")
+		return serviceErorrs.NewAppError(nil)
 	}
 
 	err = json.Unmarshal(body, ar)
 	if err != nil {
-		return serviceErorrs.NewAppError().Wrap(err, "")
+		return serviceErorrs.NewAppError(nil)
 	}
 
 	return nil
