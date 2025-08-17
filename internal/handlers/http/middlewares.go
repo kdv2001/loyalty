@@ -43,6 +43,7 @@ func (am *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 		}
 
 		token := c.Value
+
 		session, err := am.auth.AuthUser(r.Context(), domain.SessionToken{
 			Token: token,
 		})

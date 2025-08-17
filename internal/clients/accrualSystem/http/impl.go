@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/shopspring/decimal"
+
 	"github.com/kdv2001/loyalty/internal/domain"
 	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
 )
@@ -33,20 +35,20 @@ func NewClient(client httpClient, serverURL url.URL) *Client {
 type accrualsResponse struct {
 	Order   string `json:"order"`
 	Status  string `json:"status"`
-	Accrual int    `json:"accrual"`
+	Accrual int64  `json:"accrual"`
 }
 
-func (c *Client) GetAccruals(ctx context.Context, orderID domain.ID) error {
+func (c *Client) GetAccruals(ctx context.Context, orderID domain.ID) (domain.Order, error) {
 	getAccrualsURL := c.serverURL.JoinPath("api/orders", strconv.FormatUint(orderID.ID, 10))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, getAccrualsURL.String(), nil)
 	if err != nil {
-		return serviceErorrs.AppErrorFromError(err)
+		return domain.Order{}, serviceErorrs.AppErrorFromError(err)
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return serviceErorrs.AppErrorFromError(err)
+		return domain.Order{}, serviceErorrs.AppErrorFromError(err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -55,24 +57,31 @@ func (c *Client) GetAccruals(ctx context.Context, orderID domain.ID) error {
 	if resp.StatusCode != http.StatusOK {
 		switch resp.StatusCode {
 		case http.StatusNoContent:
-			return serviceErorrs.NewNoContent().Wrap(nil, "accrual status")
+			return domain.Order{}, serviceErorrs.NewNoContent().Wrap(domain.ErrNoContent, "accrual status")
 		case http.StatusInternalServerError:
-			return serviceErorrs.NewAppError(nil).Wrap(nil, "accrual status")
+			return domain.Order{}, serviceErorrs.NewAppError(nil).Wrap(nil, "accrual status")
 		case http.StatusTooManyRequests:
-			return serviceErorrs.NewTooManyRequests().Wrap(nil, "accrual status")
+			return domain.Order{}, serviceErorrs.NewTooManyRequests().Wrap(nil, "accrual status")
 		}
 	}
 
 	ar := new(accrualsResponse)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return serviceErorrs.NewAppError(nil)
+		return domain.Order{}, serviceErorrs.NewAppError(nil)
 	}
 
 	err = json.Unmarshal(body, ar)
 	if err != nil {
-		return serviceErorrs.NewAppError(nil)
+		return domain.Order{}, serviceErorrs.NewAppError(nil)
 	}
 
-	return nil
+	return domain.Order{
+		ID:    orderID,
+		State: domain.StateFromString(ar.Status),
+		AccrualAmount: domain.Money{
+			Currency: "GopherMarketBonuses",
+			Amount:   decimal.NewFromInt(ar.Accrual),
+		},
+	}, nil
 }

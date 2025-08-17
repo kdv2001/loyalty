@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
-	accrualSystemHTTP "github.com/kdv2001/loyalty/internal/clients/accrualSystem/http"
+	"github.com/kdv2001/loyalty/internal/clients/accrualSystem/mock"
 	httpHandlers "github.com/kdv2001/loyalty/internal/handlers/http"
 	"github.com/kdv2001/loyalty/internal/store/postgress/auth"
 	"github.com/kdv2001/loyalty/internal/store/postgress/loyalty"
@@ -56,19 +54,20 @@ func initService() error {
 		return err
 	}
 
-	u, err := url.Parse(initValues.accrualSystemAddress)
-	if err != nil {
-		return fmt.Errorf("failed to init looger: %w", err)
-	}
-
-	client := &http.Client{
-		Transport: http.DefaultTransport,
-		Timeout:   5 * time.Second,
-	}
-
-	accrualClient := accrualSystemHTTP.NewClient(client, *u)
+	//u, err := url.Parse(initValues.accrualSystemAddress)
+	//if err != nil {
+	//	return fmt.Errorf("failed to init looger: %w", err)
+	//}
+	//
+	//client := &http.Client{
+	//	Transport: http.DefaultTransport,
+	//	Timeout:   5 * time.Second,
+	//}
+	//
+	//accrualClient := accrualSystemHTTP.NewClient(client, *u)
+	accrualClientMock := mock.NewClient()
 	userUC := user.NewImplementation(authStore, sessionStore)
-	loyaltyUC := loyaltyUseCase.NewImplementation(accrualClient, loyaltyStore)
+	loyaltyUC := loyaltyUseCase.NewImplementation(ctx, accrualClientMock, loyaltyStore)
 
 	log, err := zap.NewDevelopment()
 	if err != nil {

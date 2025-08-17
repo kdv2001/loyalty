@@ -45,6 +45,7 @@ type Orders []Order
 
 type Order struct {
 	ID            ID
+	UserID        ID
 	State         AccrualState
 	CreatedAt     time.Time
 	AccrualAmount Money
