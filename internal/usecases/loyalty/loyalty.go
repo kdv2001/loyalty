@@ -20,6 +20,7 @@ type loyaltyStore interface {
 	GetOrderForAccruals(ctx context.Context) (domain.Orders, error)
 	AccrualPoints(ctx context.Context, o domain.Order) error
 	UpdateOrderStatus(ctx context.Context, order domain.Order) error
+	GetBalance(ctx context.Context, userID domain.ID) (domain.Balance, error)
 }
 
 type Implementation struct {
@@ -112,4 +113,8 @@ func (i *Implementation) processAccrual(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (i *Implementation) GetBalance(ctx context.Context, userID domain.ID) (domain.Balance, error) {
+	return i.store.GetBalance(ctx, userID)
 }

@@ -71,6 +71,13 @@ type Operation struct {
 }
 
 type Balance struct {
-	Current   Money
+	Accrual   Money
 	Withdrawn Money
+}
+
+func (b Balance) GetCurrent() Money {
+	return Money{
+		Amount:   b.Accrual.Amount.Sub(b.Withdrawn.Amount),
+		Currency: b.Accrual.Currency,
+	}
 }

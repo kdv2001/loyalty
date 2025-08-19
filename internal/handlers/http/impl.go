@@ -21,6 +21,7 @@ type userClient interface {
 type loyaltyClient interface {
 	AddOrder(ctx context.Context, userID domain.ID, order domain.Order) error
 	GetOrders(ctx context.Context, userID domain.ID) (domain.Orders, error)
+	GetBalance(ctx context.Context, userID domain.ID) (domain.Balance, error)
 }
 
 type Implementation struct {
@@ -245,8 +246,49 @@ func (i *Implementation) GetOrders(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+type balance struct {
+	Current   float64 `json:"current"`
+	Withdrawn float64 `json:"withdrawn"`
+}
+
 // GetBalance GET /api/user/balance — получение текущего баланса счёта баллов лояльности пользователя;
 func (i *Implementation) GetBalance(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	ctx := r.Context()
+
+	userID, isOK := getUserID(ctx)
+	if !isOK {
+		writeError(ctx, w,
+			serviceErorrs.NewAppError(nil).
+				Wrap(errors.New("invalid user id type assertion"), ""))
+		return
+	}
+
+	res, err := i.l.GetBalance(ctx, userID)
+	if err != nil {
+		writeError(ctx, w, err)
+		return
+	}
+	current, _ := res.GetCurrent().Amount.Float64()
+	withdrawn, _ := res.Withdrawn.Amount.Float64()
+	jsonBytes, err := json.Marshal(balance{
+		Current:   current,
+		Withdrawn: withdrawn,
+	})
+	if err != nil {
+		writeError(ctx, w, err)
+		return
+	}
+
+	w.Header().Set(ContentType, ApplicationJSONType)
+	_, err = w.Write(jsonBytes)
+	if err != nil {
+		writeError(ctx, w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
 	return
 }
 
