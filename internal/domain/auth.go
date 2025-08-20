@@ -2,15 +2,15 @@ package domain
 
 import "time"
 
-type ID struct {
-	ID uint64
+type Login struct {
+	Login    string
+	Password string
 }
 
 type Auth struct {
-	ID       ID
-	UserID   ID
-	Login    string
-	Password string
+	ID     ID
+	UserID ID
+	Login  Login
 }
 
 type User struct {

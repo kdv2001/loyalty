@@ -1,0 +1,99 @@
+package http
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+
+	"github.com/shopspring/decimal"
+
+	"github.com/kdv2001/loyalty/internal/domain"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceerrors"
+)
+
+const retryNums = 3
+
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+type Client struct {
+	client    httpClient
+	serverURL url.URL
+}
+
+func NewClient(client httpClient, serverURL url.URL) *Client {
+	return &Client{
+		client:    client,
+		serverURL: serverURL,
+	}
+}
+
+type accrualsResponse struct {
+	Order   string  `json:"order"`
+	Status  string  `json:"status"`
+	Accrual float64 `json:"accrual"`
+}
+
+func (c *Client) GetAccruals(ctx context.Context, orderID domain.ID) (domain.Order, error) {
+	getAccrualsURL := c.serverURL.JoinPath("api/orders", strconv.FormatUint(orderID.ID, 10))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, getAccrualsURL.String(), nil)
+	if err != nil {
+		return domain.Order{}, serviceerrors.NewAppError(err)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return domain.Order{}, serviceerrors.NewAppError(err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return domain.Order{}, serviceerrors.NewAppError(err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case http.StatusNoContent:
+			return domain.Order{}, serviceerrors.NewNoContent().Wrap(domain.ErrNoContent, "")
+		case http.StatusInternalServerError:
+			return domain.Order{}, serviceerrors.NewAppError(nil)
+		case http.StatusTooManyRequests:
+			return domain.Order{}, serviceerrors.NewTooManyRequests()
+		}
+	}
+
+	ar := new(accrualsResponse)
+	err = json.Unmarshal(body, ar)
+	if err != nil {
+		return domain.Order{}, serviceerrors.NewAppError(err)
+	}
+
+	return domain.Order{
+		ID:    orderID,
+		State: statusToDomain(ar.Status),
+		AccrualAmount: domain.Money{
+			Currency: string(domain.GopherMarketBonuses),
+			Amount:   decimal.NewFromFloat(ar.Accrual),
+		},
+	}, nil
+}
+
+func statusToDomain(state string) domain.AccrualState {
+	switch state {
+	case "REGISTERED":
+		return domain.Processing
+	case "PROCESSING":
+		return domain.Processing
+	case "PROCESSED":
+		return domain.Processed
+	}
+	return domain.Invalid
+}
