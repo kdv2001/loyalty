@@ -150,20 +150,3 @@ func (i *Implementation) GetBalance(ctx context.Context, userID domain.ID) (doma
 
 	return res, nil
 }
-
-func (i *Implementation) WithdrawPoints(ctx context.Context, operation domain.Operation) error {
-	tx, err := i.c.Begin(ctx)
-	if err != nil {
-		return serviceErorrs.NewAppError(err)
-	}
-	defer func() {
-		if err != nil {
-			if err = tx.Rollback(ctx); err != nil {
-
-			}
-		}
-	}()
-
-	tx.QueryRow(ctx, ``)
-	return nil
-}

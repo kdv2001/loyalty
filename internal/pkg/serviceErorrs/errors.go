@@ -48,6 +48,10 @@ func NewAppError(err error) *AppError {
 	return &AppError{"internal error", http.StatusInternalServerError, err, ""}
 }
 
+func NewPaymentRequired() *AppError {
+	return &AppError{"payment required", http.StatusPaymentRequired, nil, ""}
+}
+
 func AppErrorFromError(inputError error) *AppError {
 	var appErr *AppError
 	ok := errors.As(inputError, &appErr)

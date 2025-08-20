@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"github.com/kdv2001/loyalty/internal/domain"
 	"github.com/kdv2001/loyalty/internal/pkg/logger"
 	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
@@ -21,6 +23,7 @@ type loyaltyStore interface {
 	AccrualPoints(ctx context.Context, o domain.Order) error
 	UpdateOrderStatus(ctx context.Context, order domain.Order) error
 	GetBalance(ctx context.Context, userID domain.ID) (domain.Balance, error)
+	WithdrawPoints(ctx context.Context, userID domain.ID, o domain.Operation) error
 }
 
 type Implementation struct {
@@ -117,4 +120,17 @@ func (i *Implementation) processAccrual(ctx context.Context) error {
 
 func (i *Implementation) GetBalance(ctx context.Context, userID domain.ID) (domain.Balance, error) {
 	return i.store.GetBalance(ctx, userID)
+}
+
+func (i *Implementation) WithdrawPoints(ctx context.Context, userID domain.ID, o domain.Operation) error {
+	balance, err := i.store.GetBalance(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if balance.GetCurrent().Amount.LessThan(decimal.Zero) {
+		return serviceErorrs.NewPaymentRequired()
+	}
+
+	return i.store.WithdrawPoints(ctx, userID, o)
 }

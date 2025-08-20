@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"github.com/kdv2001/loyalty/internal/domain"
 	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
 )
@@ -22,6 +24,7 @@ type loyaltyClient interface {
 	AddOrder(ctx context.Context, userID domain.ID, order domain.Order) error
 	GetOrders(ctx context.Context, userID domain.ID) (domain.Orders, error)
 	GetBalance(ctx context.Context, userID domain.ID) (domain.Balance, error)
+	WithdrawPoints(ctx context.Context, userID domain.ID, o domain.Operation) error
 }
 
 type Implementation struct {
@@ -292,8 +295,67 @@ func (i *Implementation) GetBalance(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+type withdrawRequest struct {
+	Order string `json:"order"`
+	// TODO костыль полечить
+	Sum float64 `json:"sum"`
+}
+
 // WithdrawalPoints POST /api/user/balance/withdraw — запрос на списание баллов с накопительного счёта в счёт оплаты нового заказа;
 func (i *Implementation) WithdrawalPoints(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	ctx := r.Context()
+
+	userID, isOK := getUserID(ctx)
+	if !isOK {
+		writeError(ctx, w,
+			serviceErorrs.NewAppError(nil).
+				Wrap(errors.New("invalid user id type assertion"), ""))
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(ctx, w, err)
+		return
+	}
+
+	req := new(withdrawRequest)
+	if err = json.Unmarshal(body, req); err != nil {
+		appErr := serviceErorrs.NewBadRequest().LogServerError(r.Context())
+		http.Error(w, appErr.String(), appErr.Code)
+		return
+	}
+
+	//if isValidID := LuhnAlgorithm(string(body)); !isValidID {
+	//	writeError(ctx, w,
+	//		serviceErorrs.NewUnprocessableEntity().Wrap(nil, "invalid order id"))
+	//	return
+	//}
+
+	orderID, err := strconv.ParseUint(req.Order, 10, 64)
+	if err != nil {
+		writeError(ctx, w,
+			serviceErorrs.NewAppError(nil).Wrap(err, ""))
+		return
+	}
+
+	if err = i.l.WithdrawPoints(
+		ctx,
+		userID,
+		domain.Operation{
+			OrderID: domain.ID{
+				ID: orderID,
+			},
+			Amount: domain.Money{
+				Currency: string(domain.GopherMarketBonuses),
+				Amount:   decimal.NewFromFloat(req.Sum),
+			},
+		},
+	); err != nil {
+		writeError(ctx, w, err)
+		return
+	}
 	return
 }
 
