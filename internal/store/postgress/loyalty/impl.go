@@ -9,7 +9,7 @@ import (
 
 	"github.com/kdv2001/loyalty/internal/domain"
 	"github.com/kdv2001/loyalty/internal/pkg/logger"
-	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceerrors"
 )
 
 type Implementation struct {
@@ -69,7 +69,7 @@ type orderModel struct {
 func (i *Implementation) UpdateOrderStatus(ctx context.Context, order domain.Order) error {
 	_, err := i.c.Exec(ctx, "UPDATE orders SET state = $1 WHERE order_id = $2", order.State, order.ID.ID)
 	if err != nil {
-		return serviceErorrs.NewAppError(err)
+		return serviceerrors.NewAppError(err)
 	}
 
 	return nil
@@ -79,7 +79,7 @@ func (i *Implementation) GetOrderForAccruals(ctx context.Context) (domain.Orders
 	iter, err := i.c.Query(ctx, `select user_id, order_id, state, created_at, currency, amount from orders
                             where state = $1 or state = $2 order by orders.created_at desc limit 1`, domain.Processing, domain.New)
 	if err != nil {
-		return nil, serviceErorrs.NewAppError(err)
+		return nil, serviceerrors.NewAppError(err)
 	}
 
 	res := make(domain.Orders, 0)
@@ -88,7 +88,7 @@ func (i *Implementation) GetOrderForAccruals(ctx context.Context) (domain.Orders
 		err = iter.Scan(&order.UserID, &order.OrderID, &order.Status,
 			&order.CreatedAt, &order.Currency, &order.AccrualAmount)
 		if err != nil {
-			return nil, serviceErorrs.NewAppError(err)
+			return nil, serviceerrors.NewAppError(err)
 		}
 
 		state := domain.StateFromString(order.Status.String)
@@ -126,14 +126,14 @@ type balance struct {
 func (i *Implementation) GetBalance(ctx context.Context, userID domain.ID) (domain.Balance, error) {
 	iter, err := i.c.Query(ctx, `select operation, sum(amount) as sum from operations where user_id = $1 group by operation`, userID.ID)
 	if err != nil {
-		return domain.Balance{}, serviceErorrs.NewAppError(err)
+		return domain.Balance{}, serviceerrors.NewAppError(err)
 	}
 
 	res := domain.Balance{}
 	for iter.Next() {
 		b := balance{}
 		if err = iter.Scan(&b.Operation, &b.Amount); err != nil {
-			return domain.Balance{}, serviceErorrs.NewAppError(err)
+			return domain.Balance{}, serviceerrors.NewAppError(err)
 		}
 
 		m := domain.Money{

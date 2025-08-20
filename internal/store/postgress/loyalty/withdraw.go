@@ -7,14 +7,14 @@ import (
 
 	"github.com/kdv2001/loyalty/internal/domain"
 	"github.com/kdv2001/loyalty/internal/pkg/logger"
-	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceerrors"
 )
 
 func (i *Implementation) WithdrawPoints(ctx context.Context,
 	userID domain.ID, o domain.Operation) error {
 	tx, err := i.c.Begin(ctx)
 	if err != nil {
-		return serviceErorrs.NewAppError(err)
+		return serviceerrors.NewAppError(err)
 	}
 
 	defer func() {
@@ -29,19 +29,19 @@ func (i *Implementation) WithdrawPoints(ctx context.Context,
 			values ($1, $2, $3, $4, $5)`, userID.ID, o.OrderID.ID, o.Amount.Amount,
 		o.Amount.Currency, domain.Withdraw)
 	if err != nil {
-		return serviceErorrs.NewAppError(err)
+		return serviceerrors.NewAppError(err)
 	}
 
 	iter, err := tx.Query(ctx, `select operation, sum(amount) as sum from operations where user_id = $1 group by operation`, userID.ID)
 	if err != nil {
-		return serviceErorrs.NewAppError(err)
+		return serviceerrors.NewAppError(err)
 	}
 
 	res := domain.Balance{}
 	for iter.Next() {
 		b := balance{}
 		if err = iter.Scan(&b.Operation, &b.Amount); err != nil {
-			return serviceErorrs.NewAppError(err)
+			return serviceerrors.NewAppError(err)
 		}
 
 		m := domain.Money{
@@ -59,19 +59,19 @@ func (i *Implementation) WithdrawPoints(ctx context.Context,
 	err = tx.QueryRow(ctx, `select  count(*) as sum from operations where order_id = $1   and operation =  'WITHDRAW'`,
 		o.OrderID.ID).Scan(&rowNum)
 	if err != nil {
-		return serviceErorrs.NewAppError(err)
+		return serviceerrors.NewAppError(err)
 	}
 
 	if rowNum > 1 {
-		return serviceErorrs.NewBadRequest().Wrap(nil, "try with more than 1 transaction")
+		return serviceerrors.NewBadRequest().Wrap(nil, "try with more than 1 transaction")
 	}
 
 	if res.GetCurrent().Amount.LessThan(decimal.Zero) {
-		return serviceErorrs.NewPaymentRequired().Wrap(nil, "balance less than zero")
+		return serviceerrors.NewPaymentRequired().Wrap(nil, "balance less than zero")
 	}
 
 	if err = tx.Commit(ctx); err != nil {
-		return serviceErorrs.NewAppError(err)
+		return serviceerrors.NewAppError(err)
 	}
 
 	return nil

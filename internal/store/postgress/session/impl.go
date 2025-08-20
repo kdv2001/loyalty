@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kdv2001/loyalty/internal/domain"
-	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceerrors"
 )
 
 type Implementation struct {
@@ -79,7 +79,7 @@ func (repo *Implementation) GetSessions(ctx context.Context, token domain.Sessio
 	if err := repo.c.QueryRow(ctx, `Select id, user_id, created_at, device from session where token = $1`,
 		token.Token).Scan(&s.ID, &s.UserID, &s.CreatedAt, &s.Device); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return domain.SessionInfo{}, serviceErorrs.NewNotFound().
+			return domain.SessionInfo{}, serviceerrors.NewNotFound().
 				Wrap(domain.ErrNotFound, "session not found")
 		}
 

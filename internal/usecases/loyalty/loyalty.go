@@ -9,7 +9,7 @@ import (
 
 	"github.com/kdv2001/loyalty/internal/domain"
 	"github.com/kdv2001/loyalty/internal/pkg/logger"
-	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceerrors"
 )
 
 type loyaltyClient interface {
@@ -72,7 +72,7 @@ func (i *Implementation) ProcessAccrual(ctx context.Context) {
 		case <-ticker.C:
 			err := i.processAccrual(ctx)
 			if err != nil {
-				_ = serviceErorrs.AppErrorFromError(err).LogServerError(ctx)
+				_ = serviceerrors.AppErrorFromError(err).LogServerError(ctx)
 			}
 		}
 	}
@@ -131,7 +131,7 @@ func (i *Implementation) WithdrawPoints(ctx context.Context, userID domain.ID, o
 	}
 
 	if balance.GetCurrent().Amount.LessThan(decimal.Zero) {
-		return serviceErorrs.NewPaymentRequired()
+		return serviceerrors.NewPaymentRequired()
 	}
 
 	return i.store.WithdrawPoints(ctx, userID, o)
@@ -144,7 +144,7 @@ func (i *Implementation) GetWithdrawals(ctx context.Context, userID domain.ID) (
 	}
 
 	if len(res) == 0 {
-		return nil, serviceErorrs.NewNoContent()
+		return nil, serviceerrors.NewNoContent()
 	}
 
 	return res, nil

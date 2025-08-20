@@ -11,7 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/kdv2001/loyalty/internal/domain"
-	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceerrors"
 )
 
 const retryNums = 3
@@ -43,12 +43,12 @@ func (c *Client) GetAccruals(ctx context.Context, orderID domain.ID) (domain.Ord
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, getAccrualsURL.String(), nil)
 	if err != nil {
-		return domain.Order{}, serviceErorrs.NewAppError(err)
+		return domain.Order{}, serviceerrors.NewAppError(err)
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return domain.Order{}, serviceErorrs.NewAppError(err)
+		return domain.Order{}, serviceerrors.NewAppError(err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -56,24 +56,24 @@ func (c *Client) GetAccruals(ctx context.Context, orderID domain.ID) (domain.Ord
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return domain.Order{}, serviceErorrs.NewAppError(err)
+		return domain.Order{}, serviceerrors.NewAppError(err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		switch resp.StatusCode {
 		case http.StatusNoContent:
-			return domain.Order{}, serviceErorrs.NewNoContent().Wrap(domain.ErrNoContent, "")
+			return domain.Order{}, serviceerrors.NewNoContent().Wrap(domain.ErrNoContent, "")
 		case http.StatusInternalServerError:
-			return domain.Order{}, serviceErorrs.NewAppError(nil)
+			return domain.Order{}, serviceerrors.NewAppError(nil)
 		case http.StatusTooManyRequests:
-			return domain.Order{}, serviceErorrs.NewTooManyRequests()
+			return domain.Order{}, serviceerrors.NewTooManyRequests()
 		}
 	}
 
 	ar := new(accrualsResponse)
 	err = json.Unmarshal(body, ar)
 	if err != nil {
-		return domain.Order{}, serviceErorrs.NewAppError(err)
+		return domain.Order{}, serviceerrors.NewAppError(err)
 	}
 
 	return domain.Order{

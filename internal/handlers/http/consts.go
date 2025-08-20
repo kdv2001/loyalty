@@ -4,6 +4,10 @@ const (
 	AuthorizationKey    = "Authorization"
 	ContentType         = "Content-Type"
 	ApplicationJSONType = "application/json"
+)
 
-	userIDKey = "userIDKey" //
+type key string
+
+const (
+	userIDKey key = "userIDKey"
 )

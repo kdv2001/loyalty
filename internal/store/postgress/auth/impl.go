@@ -51,7 +51,7 @@ func NewImplementation(ctx context.Context, c *pgxpool.Pool) (*Implementation, e
 }
 
 type auth struct {
-	Id           sql.NullInt64  `db:"id"`
+	ID           sql.NullInt64  `db:"id"`
 	UserID       sql.NullInt64  `db:"user_id"`
 	Login        sql.NullString `db:"login"`
 	PasswordHash sql.NullString `db:"password_hash"`
@@ -137,7 +137,7 @@ func (repo *Implementation) Register(ctx context.Context, a domain.Login) (domai
 func (repo *Implementation) Login(ctx context.Context, authReq domain.Login) (domain.Auth, error) {
 	a := auth{}
 	err := repo.c.QueryRow(ctx, `Select id, user_id, login, password_hash, salt from auth where login = $1`, authReq.Login).
-		Scan(&a.Id, &a.UserID, &a.Login, &a.PasswordHash, &a.Salt)
+		Scan(&a.ID, &a.UserID, &a.Login, &a.PasswordHash, &a.Salt)
 	if err != nil {
 		return domain.Auth{}, err
 	}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/kdv2001/loyalty/internal/domain"
 	"github.com/kdv2001/loyalty/internal/pkg/logger"
-	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceerrors"
 )
 
 type authClient interface {
@@ -37,7 +37,7 @@ func (am *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 				switch {
 				case errors.Is(err, http.ErrNoCookie):
 					writeError(r.Context(), w,
-						serviceErorrs.NewUnauthorized().Wrap(err, "authorized cookie not found"))
+						serviceerrors.NewUnauthorized().Wrap(err, "authorized cookie not found"))
 					return
 				}
 
@@ -54,7 +54,7 @@ func (am *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
 				writeError(r.Context(), w,
-					serviceErorrs.NewUnauthorized().Wrap(err, "authorized cookie not found"))
+					serviceerrors.NewUnauthorized().Wrap(err, "authorized cookie not found"))
 			}
 			writeError(r.Context(), w, err)
 			return
@@ -64,7 +64,6 @@ func (am *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
-		return
 	})
 }
 

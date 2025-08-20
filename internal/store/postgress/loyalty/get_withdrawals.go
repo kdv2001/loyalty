@@ -7,7 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/kdv2001/loyalty/internal/domain"
-	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceerrors"
 )
 
 type operation struct {
@@ -20,7 +20,7 @@ func (i *Implementation) GetWithdrawals(ctx context.Context, userID domain.ID) (
 	iter, err := i.c.Query(ctx, `select order_id, amount, created_at from operations where user_id = $1
   			and operation = 'WITHDRAW'`, userID.ID)
 	if err != nil {
-		return nil, serviceErorrs.NewAppError(err)
+		return nil, serviceerrors.NewAppError(err)
 	}
 
 	res := make([]domain.Operation, 0, 10)
@@ -28,7 +28,7 @@ func (i *Implementation) GetWithdrawals(ctx context.Context, userID domain.ID) (
 		o := operation{}
 		err = iter.Scan(&o.OrderID, &o.Amount, &o.CreatedAt)
 		if err != nil {
-			return nil, serviceErorrs.NewAppError(err)
+			return nil, serviceerrors.NewAppError(err)
 		}
 
 		res = append(res, domain.Operation{

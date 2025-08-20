@@ -12,7 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/kdv2001/loyalty/internal/domain"
-	"github.com/kdv2001/loyalty/internal/pkg/serviceErorrs"
+	"github.com/kdv2001/loyalty/internal/pkg/serviceerrors"
 )
 
 type userClient interface {
@@ -48,17 +48,16 @@ type login struct {
 // Register POST /api/user/register — регистрация пользователя;
 func (i *Implementation) Register(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	ctx := r.Context()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		appErr := serviceErorrs.AppErrorFromError(err).LogServerError(r.Context())
-		http.Error(w, appErr.String(), appErr.Code)
+		writeError(ctx, w, serviceerrors.NewAppError(err))
 		return
 	}
 
 	l := login{}
 	if err = json.Unmarshal(body, &l); err != nil {
-		appErr := serviceErorrs.NewBadRequest().LogServerError(r.Context())
-		http.Error(w, appErr.String(), appErr.Code)
+		writeError(ctx, w, serviceerrors.NewBadRequest())
 		return
 	}
 
@@ -67,8 +66,7 @@ func (i *Implementation) Register(w http.ResponseWriter, r *http.Request) {
 		Password: l.Password,
 	})
 	if err != nil {
-		appErr := serviceErorrs.AppErrorFromError(err).LogServerError(r.Context())
-		http.Error(w, appErr.String(), appErr.Code)
+		writeError(ctx, w, serviceerrors.NewAppError(err))
 		return
 	}
 
@@ -83,16 +81,14 @@ func (i *Implementation) Register(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	if _, err = w.Write([]byte("success register and authorize")); err != nil {
-		appErr := serviceErorrs.AppErrorFromError(err).LogServerError(r.Context())
-		http.Error(w, appErr.String(), appErr.Code)
+		writeError(ctx, w, serviceerrors.NewAppError(err))
 	}
-
-	return
 }
 
 // Login POST /api/user/login — аутентификация пользователя;
 func (i *Implementation) Login(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	ctx := r.Context()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 
@@ -101,18 +97,17 @@ func (i *Implementation) Login(w http.ResponseWriter, r *http.Request) {
 
 	l := login{}
 	if err = json.Unmarshal(body, &l); err != nil {
-		appErr := serviceErorrs.NewBadRequest().LogServerError(r.Context())
-		http.Error(w, appErr.String(), appErr.Code)
+		writeError(ctx, w, serviceerrors.NewBadRequest())
 		return
 	}
 
-	authInfo, err := i.a.LoginUser(r.Context(), domain.Login{
+	authInfo, err := i.a.LoginUser(ctx, domain.Login{
 		Login:    l.Login,
 		Password: l.Password,
 	})
 	if err != nil {
-		appErr := serviceErorrs.AppErrorFromError(err).LogServerError(r.Context())
-		http.Error(w, appErr.String(), appErr.Code)
+		writeError(ctx, w, err)
+
 		return
 	}
 
@@ -128,11 +123,8 @@ func (i *Implementation) Login(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	if _, err = w.Write([]byte("success authorize")); err != nil {
-		appErr := serviceErorrs.AppErrorFromError(err).LogServerError(r.Context())
-		http.Error(w, appErr.String(), appErr.Code)
+		writeError(ctx, w, serviceerrors.NewAppError(err))
 	}
-
-	return
 }
 
 // AddOrder POST /api/user/orders — загрузка пользователем номера заказа для расчёта;
@@ -147,14 +139,14 @@ func (i *Implementation) AddOrder(w http.ResponseWriter, r *http.Request) {
 
 	if isValidID := LuhnAlgorithm(string(body)); !isValidID {
 		writeError(ctx, w,
-			serviceErorrs.NewUnprocessableEntity().Wrap(nil, "invalid order id"))
+			serviceerrors.NewUnprocessableEntity().Wrap(nil, "invalid order id"))
 		return
 	}
 
 	userID, isOK := getUserID(ctx)
 	if !isOK {
 		writeError(ctx, w,
-			serviceErorrs.NewAppError(nil).
+			serviceerrors.NewAppError(nil).
 				Wrap(errors.New("invalid user id type assertion"), ""))
 		return
 	}
@@ -162,17 +154,17 @@ func (i *Implementation) AddOrder(w http.ResponseWriter, r *http.Request) {
 	orderID, err := strconv.ParseUint(string(body), 10, 64)
 	if err != nil {
 		writeError(ctx, w,
-			serviceErorrs.NewAppError(nil).Wrap(err, ""))
+			serviceerrors.NewAppError(nil).Wrap(err, ""))
 		return
 	}
 
-	order := domain.Order{
+	domainOrder := domain.Order{
 		ID: domain.ID{
 			ID: orderID,
 		},
 	}
 
-	if err = i.l.AddOrder(ctx, userID, order); err != nil {
+	if err = i.l.AddOrder(ctx, userID, domainOrder); err != nil {
 		switch {
 		case errors.Is(err, domain.ErrActionCompletedEarly):
 			w.WriteHeader(http.StatusOK)
@@ -183,8 +175,6 @@ func (i *Implementation) AddOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
-
-	return
 }
 
 type order struct {
@@ -204,7 +194,7 @@ func (i *Implementation) GetOrders(w http.ResponseWriter, r *http.Request) {
 	userID, isOK := getUserID(ctx)
 	if !isOK {
 		writeError(ctx, w,
-			serviceErorrs.NewAppError(nil).
+			serviceerrors.NewAppError(nil).
 				Wrap(errors.New("invalid user id type assertion"), ""))
 		return
 	}
@@ -246,8 +236,6 @@ func (i *Implementation) GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-
-	return
 }
 
 type balance struct {
@@ -263,7 +251,7 @@ func (i *Implementation) GetBalance(w http.ResponseWriter, r *http.Request) {
 	userID, isOK := getUserID(ctx)
 	if !isOK {
 		writeError(ctx, w,
-			serviceErorrs.NewAppError(nil).
+			serviceerrors.NewAppError(nil).
 				Wrap(errors.New("invalid user id type assertion"), ""))
 		return
 	}
@@ -292,8 +280,6 @@ func (i *Implementation) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-
-	return
 }
 
 type withdrawRequest struct {
@@ -310,7 +296,7 @@ func (i *Implementation) WithdrawalPoints(w http.ResponseWriter, r *http.Request
 	userID, isOK := getUserID(ctx)
 	if !isOK {
 		writeError(ctx, w,
-			serviceErorrs.NewAppError(nil).
+			serviceerrors.NewAppError(nil).
 				Wrap(errors.New("invalid user id type assertion"), ""))
 		return
 	}
@@ -323,21 +309,21 @@ func (i *Implementation) WithdrawalPoints(w http.ResponseWriter, r *http.Request
 
 	req := new(withdrawRequest)
 	if err = json.Unmarshal(body, req); err != nil {
-		appErr := serviceErorrs.NewBadRequest().LogServerError(r.Context())
+		appErr := serviceerrors.NewBadRequest().LogServerError(r.Context())
 		http.Error(w, appErr.String(), appErr.Code)
 		return
 	}
 
-	//if isValidID := LuhnAlgorithm(string(body)); !isValidID {
-	//	writeError(ctx, w,
-	//		serviceErorrs.NewUnprocessableEntity().Wrap(nil, "invalid order id"))
-	//	return
-	//}
+	if isValidID := LuhnAlgorithm(req.Order); !isValidID {
+		writeError(ctx, w,
+			serviceerrors.NewUnprocessableEntity().Wrap(nil, "invalid order id"))
+		return
+	}
 
 	orderID, err := strconv.ParseUint(req.Order, 10, 64)
 	if err != nil {
 		writeError(ctx, w,
-			serviceErorrs.NewAppError(nil).Wrap(err, ""))
+			serviceerrors.NewAppError(nil).Wrap(err, ""))
 		return
 	}
 
@@ -357,7 +343,6 @@ func (i *Implementation) WithdrawalPoints(w http.ResponseWriter, r *http.Request
 		writeError(ctx, w, err)
 		return
 	}
-	return
 }
 
 type withdrawOperation struct {
@@ -375,7 +360,7 @@ func (i *Implementation) GetWithdrawals(w http.ResponseWriter, r *http.Request) 
 	userID, isOK := getUserID(ctx)
 	if !isOK {
 		writeError(ctx, w,
-			serviceErorrs.NewAppError(nil).
+			serviceerrors.NewAppError(nil).
 				Wrap(errors.New("invalid user id type assertion"), ""))
 		return
 	}
@@ -398,24 +383,22 @@ func (i *Implementation) GetWithdrawals(w http.ResponseWriter, r *http.Request) 
 
 	body, err := json.Marshal(jsonResult)
 	if err != nil {
-		writeError(ctx, w, serviceErorrs.NewBadRequest())
+		writeError(ctx, w, serviceerrors.NewBadRequest())
 		return
 	}
 
 	w.Header().Set(ContentType, ApplicationJSONType)
 	_, err = w.Write(body)
 	if err != nil {
-		writeError(ctx, w, serviceErorrs.NewAppError(err))
+		writeError(ctx, w, serviceerrors.NewAppError(err))
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-
-	return
 }
 
 func writeError(ctx context.Context, w http.ResponseWriter, err error) {
-	appErr := serviceErorrs.AppErrorFromError(err).LogServerError(ctx)
+	appErr := serviceerrors.AppErrorFromError(err).LogServerError(ctx)
 	http.Error(w, appErr.String(), appErr.Code)
 }
 
