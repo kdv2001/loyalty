@@ -24,6 +24,7 @@ type loyaltyStore interface {
 	UpdateOrderStatus(ctx context.Context, order domain.Order) error
 	GetBalance(ctx context.Context, userID domain.ID) (domain.Balance, error)
 	WithdrawPoints(ctx context.Context, userID domain.ID, o domain.Operation) error
+	GetWithdrawals(ctx context.Context, userID domain.ID) ([]domain.Operation, error)
 }
 
 type Implementation struct {
@@ -77,6 +78,7 @@ func (i *Implementation) ProcessAccrual(ctx context.Context) {
 	}
 }
 
+// TODO подумать, как делать это из разных подов
 func (i *Implementation) processAccrual(ctx context.Context) error {
 	orders, err := i.store.GetOrderForAccruals(ctx)
 	if err != nil {
@@ -133,4 +135,17 @@ func (i *Implementation) WithdrawPoints(ctx context.Context, userID domain.ID, o
 	}
 
 	return i.store.WithdrawPoints(ctx, userID, o)
+}
+
+func (i *Implementation) GetWithdrawals(ctx context.Context, userID domain.ID) ([]domain.Operation, error) {
+	res, err := i.store.GetWithdrawals(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res) == 0 {
+		return nil, serviceErorrs.NewNoContent()
+	}
+
+	return res, nil
 }

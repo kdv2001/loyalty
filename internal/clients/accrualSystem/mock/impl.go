@@ -20,7 +20,7 @@ func (c *Client) GetAccruals(_ context.Context, orderID domain.ID) (domain.Order
 		ID:    orderID,
 		State: domain.Processed,
 		AccrualAmount: domain.Money{
-			Currency: "GopherMarketBonuses",
+			Currency: string(domain.GopherMarketBonuses),
 			Amount:   decimal.NewFromInt(150),
 		},
 	}, nil

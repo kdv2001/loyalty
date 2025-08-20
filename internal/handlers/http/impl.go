@@ -25,6 +25,7 @@ type loyaltyClient interface {
 	GetOrders(ctx context.Context, userID domain.ID) (domain.Orders, error)
 	GetBalance(ctx context.Context, userID domain.ID) (domain.Balance, error)
 	WithdrawPoints(ctx context.Context, userID domain.ID, o domain.Operation) error
+	GetWithdrawals(ctx context.Context, userID domain.ID) ([]domain.Operation, error)
 }
 
 type Implementation struct {
@@ -359,9 +360,57 @@ func (i *Implementation) WithdrawalPoints(w http.ResponseWriter, r *http.Request
 	return
 }
 
+type withdrawOperation struct {
+	Order       string  `json:"order"`
+	Sum         float64 `json:"sum"`
+	ProcessedAt string  `json:"processed_at"`
+}
+
 // GetWithdrawals GET /api/user/withdrawals — получение информации о выводе средств с накопительного счёта пользователем.
 // TODO пагинация
 func (i *Implementation) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	ctx := r.Context()
+
+	userID, isOK := getUserID(ctx)
+	if !isOK {
+		writeError(ctx, w,
+			serviceErorrs.NewAppError(nil).
+				Wrap(errors.New("invalid user id type assertion"), ""))
+		return
+	}
+
+	res, err := i.l.GetWithdrawals(ctx, userID)
+	if err != nil {
+		writeError(ctx, w, err)
+		return
+	}
+
+	jsonResult := make([]withdrawOperation, 0, len(res))
+	for _, ro := range res {
+		amount, _ := ro.Amount.Amount.Float64()
+		jsonResult = append(jsonResult, withdrawOperation{
+			Order:       strconv.FormatUint(ro.OrderID.ID, 10),
+			Sum:         amount,
+			ProcessedAt: ro.CratedAt.Format(time.RFC3339),
+		})
+	}
+
+	body, err := json.Marshal(jsonResult)
+	if err != nil {
+		writeError(ctx, w, serviceErorrs.NewBadRequest())
+		return
+	}
+
+	w.Header().Set(ContentType, ApplicationJSONType)
+	_, err = w.Write(body)
+	if err != nil {
+		writeError(ctx, w, serviceErorrs.NewAppError(err))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
 	return
 }
 
