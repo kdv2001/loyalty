@@ -14,7 +14,7 @@ type flags struct {
 }
 
 func initFlags() (flags, error) {
-	serverAddr := flag.String("a", ":8080", "The address to bind the server to")
+	serverAddr := flag.String("a", ":8081", "The address to bind the server to")
 	postgresDSN := flag.String("d", "", "The flag to Postgres DSN")
 	accrualSystemAddress := flag.String("r", "", "The accrual system address")
 

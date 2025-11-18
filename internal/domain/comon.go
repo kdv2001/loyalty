@@ -1,5 +1,5 @@
 package domain
 
-type Order struct {
+type ID struct {
 	ID uint64
 }

@@ -8,8 +8,8 @@ import (
 )
 
 type authRepo interface {
-	Register(ctx context.Context, a domain.Auth) (domain.ID, error)
-	GetAuth(ctx context.Context, user domain.Auth) (domain.Auth, error)
+	Register(ctx context.Context, login domain.Login) (domain.ID, error)
+	Login(ctx context.Context, login domain.Login) (domain.Auth, error)
 }
 
 type SessionStore interface {
@@ -38,7 +38,7 @@ type Register struct {
 	Password string
 }
 
-func (a *Implementation) RegisterAndLoginUser(ctx context.Context, reg domain.Auth) (domain.SessionToken, error) {
+func (a *Implementation) RegisterAndLoginUser(ctx context.Context, reg domain.Login) (domain.SessionToken, error) {
 	_, err := a.RegisterUser(ctx, reg)
 	if err != nil {
 		return domain.SessionToken{}, err
@@ -52,8 +52,8 @@ func (a *Implementation) RegisterAndLoginUser(ctx context.Context, reg domain.Au
 	return token, nil
 }
 
-func (a *Implementation) LoginUser(ctx context.Context, reg domain.Auth) (domain.SessionToken, error) {
-	auth, err := a.authRepo.GetAuth(ctx, reg)
+func (a *Implementation) LoginUser(ctx context.Context, reg domain.Login) (domain.SessionToken, error) {
+	auth, err := a.authRepo.Login(ctx, reg)
 	if err != nil {
 		return domain.SessionToken{}, err
 	}
@@ -79,7 +79,7 @@ func (a *Implementation) AuthUser(ctx context.Context, token domain.SessionToken
 	return session, nil
 }
 
-func (a *Implementation) RegisterUser(ctx context.Context, reg domain.Auth) (domain.ID, error) {
+func (a *Implementation) RegisterUser(ctx context.Context, reg domain.Login) (domain.ID, error) {
 	user, err := a.authRepo.Register(ctx, reg)
 	if err != nil {
 		return domain.ID{}, err

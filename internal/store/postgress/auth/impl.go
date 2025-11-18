@@ -51,7 +51,7 @@ func NewImplementation(ctx context.Context, c *pgxpool.Pool) (*Implementation, e
 }
 
 type auth struct {
-	Id           sql.NullInt64  `db:"id"`
+	ID           sql.NullInt64  `db:"id"`
 	UserID       sql.NullInt64  `db:"user_id"`
 	Login        sql.NullString `db:"login"`
 	PasswordHash sql.NullString `db:"password_hash"`
@@ -88,7 +88,7 @@ func generateSalt(length int) ([]byte, error) {
 	return b, nil
 }
 
-func (repo *Implementation) Register(ctx context.Context, a domain.Auth) (domain.ID, error) {
+func (repo *Implementation) Register(ctx context.Context, a domain.Login) (domain.ID, error) {
 	salt, err := generateSalt(saltLength)
 	if err != nil {
 		return domain.ID{}, err
@@ -134,10 +134,10 @@ func (repo *Implementation) Register(ctx context.Context, a domain.Auth) (domain
 	}, nil
 }
 
-func (repo *Implementation) GetAuth(ctx context.Context, authReq domain.Auth) (domain.Auth, error) {
+func (repo *Implementation) Login(ctx context.Context, authReq domain.Login) (domain.Auth, error) {
 	a := auth{}
 	err := repo.c.QueryRow(ctx, `Select id, user_id, login, password_hash, salt from auth where login = $1`, authReq.Login).
-		Scan(&a.Id, &a.UserID, &a.Login, &a.PasswordHash, &a.Salt)
+		Scan(&a.ID, &a.UserID, &a.Login, &a.PasswordHash, &a.Salt)
 	if err != nil {
 		return domain.Auth{}, err
 	}
@@ -157,10 +157,10 @@ func (repo *Implementation) GetAuth(ctx context.Context, authReq domain.Auth) (d
 	}
 
 	return domain.Auth{
+		ID: domain.ID{},
 		UserID: domain.ID{
 			ID: uint64(a.UserID.Int64),
 		},
-		Login:    a.Login.String,
-		Password: a.PasswordHash.String,
+		Login: authReq,
 	}, nil
 }
